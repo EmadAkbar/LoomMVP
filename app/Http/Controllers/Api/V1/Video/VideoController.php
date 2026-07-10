@@ -73,7 +73,7 @@ class VideoController extends Controller
 
     public function update(UpdateVideoRequest $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id === $request->user()->id, 403);
+        abort_unless($video->user_id == $request->user()->id, 403);
 
         $video = $this->videoService->update($video, $request->validated());
 
@@ -87,7 +87,7 @@ class VideoController extends Controller
 
     public function destroy(Request $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id === $request->user()->id, 403);
+        abort_unless($video->user_id == $request->user()->id, 403);
 
         $this->videoService->delete($video);
 
