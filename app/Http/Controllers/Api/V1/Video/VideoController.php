@@ -53,7 +53,7 @@ class VideoController extends Controller
 
     public function show(Request $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id === $request->user()->id, 403);
+        // abort_unless($video->user_id === $request->user()->id, 403);
 
         return response()->json([
             'success' => true,
