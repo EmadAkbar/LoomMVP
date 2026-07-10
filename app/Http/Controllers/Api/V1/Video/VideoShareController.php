@@ -17,7 +17,7 @@ class VideoShareController extends Controller
 
     public function store(Request $request, Video $video): JsonResponse
     {
-        if ($video->user_id !== auth()->user()->id) {
+        if ($video->user_id != auth()->user()->id) {
             abort(404);
         }
 
