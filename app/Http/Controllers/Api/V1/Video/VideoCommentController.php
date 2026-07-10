@@ -13,7 +13,7 @@ class VideoCommentController extends Controller
 {
     public function index(Request $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id === $request->user()->id, 403);
+        abort_unless($video->user_id == $request->user()->id, 403);
 
         $comments = $video->comments()->oldest('timestamp_seconds')->get();
 
