@@ -28,11 +28,12 @@ class VideoService
             ->paginate($perPage);
     }
 
-    public function createUploadUrl(int $userId, string $title = 'Untitled Video'): array
+    public function createUploadUrl(int $userId, string $title = 'Untitled Video', ?string $description = null): array
     {
         $video = Video::query()->create([
             'user_id' => $userId,
             'title' => $title,
+            'description' => $description,
             'slug' => $this->uniqueSlug($title),
             'status' => VideoStatus::Uploading,
             'privacy' => VideoPrivacy::Private,
@@ -43,6 +44,7 @@ class VideoService
                 'video_id' => (string) $video->uuid,
                 'user_id' => (string) $userId,
                 'title' => $title,
+                'description' => $description,
             ]);
 
             $uploadUid = $directUpload['uid'] ?? null;

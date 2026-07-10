@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Video;
 
+use App\Enums\VideoPrivacy;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Video\CreateUploadUrlRequest;
 use App\Http\Requests\Video\UpdateVideoRequest;
@@ -34,7 +35,8 @@ class VideoController extends Controller
     {
         $result = $this->videoService->createUploadUrl(
             userId: $request->user()->id,
-            title: $request->input('title', 'Untitled Video')
+            title: $request->input('title', 'Untitled Video'),
+            description: $request->input('description', null),
         );
 
         return response()->json([
