@@ -47,20 +47,11 @@ class VideoShareController extends Controller
         $share->load('video');
         $video = $share->video;
 
-        if (! $share->is_active || ($share->expires_at && $share->expires_at->isPast())) {
+        if (! $this->isShareActive($share) || ! $this->isVideoShareable($video)) {
             abort(404);
         }
 
-        if ($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private) {
-            abort(404);
-        }
-
-        $isPublicVideo = $video->privacy === VideoPrivacy::Public;
-        $requiresPassword = ! $isPublicVideo && (
-            $video->privacy === VideoPrivacy::Password ||
-            $video->password_hash !== null ||
-            $share->password_hash !== null
-        );
+        $requiresPassword = $this->requiresPassword($video, $share);
 
         return response()->json([
             'success' => true,
@@ -86,18 +77,14 @@ class VideoShareController extends Controller
         $share->load('video');
         $video = $share->video;
 
-        if (! $share->is_active || ($share->expires_at && $share->expires_at->isPast())) {
+        if (! $this->isShareActive($share) || ! $this->isVideoShareable($video)) {
             abort(404);
         }
 
-        if ($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private) {
-            abort(404);
-        }
-
-        if ($video->privacy === VideoPrivacy::Public) {
+        if (! $this->requiresPassword($video, $share)) {
             return response()->json([
                 'success' => true,
-                'message' => 'Password not required for public video.',
+                'message' => 'Password not required for this video.',
                 'data' => ['video' => new VideoResource($video)],
                 'errors' => null,
             ]);
@@ -114,5 +101,26 @@ class VideoShareController extends Controller
             'data' => ['video' => new VideoResource($video)],
             'errors' => null,
         ]);
+    }
+
+    private function isShareActive(VideoShare $share): bool
+    {
+        return $share->is_active && (! $share->expires_at || ! $share->expires_at->isPast());
+    }
+
+    private function isVideoShareable(Video $video): bool
+    {
+        return $video->privacy !== VideoPrivacy::Disabled;
+    }
+
+    private function requiresPassword(Video $video, VideoShare $share): bool
+    {
+        if ($video->privacy === VideoPrivacy::Public) {
+            return false;
+        }
+
+        return $video->privacy === VideoPrivacy::Password
+            || $video->password_hash !== null
+            || $share->password_hash !== null;
     }
 }
