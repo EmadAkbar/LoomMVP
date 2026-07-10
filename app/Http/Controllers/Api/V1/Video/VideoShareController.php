@@ -10,7 +10,6 @@ use App\Models\VideoShare;
 use App\Services\Video\VideoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class VideoShareController extends Controller
 {
@@ -18,16 +17,26 @@ class VideoShareController extends Controller
 
     public function store(Request $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id === $request->user()->id, 403);
+        if ($video->user_id !== $request->user()->id) {
+            abort(404);
+        }
 
         $validated = $request->validate([
-            'password' => ['nullable', 'string', 'min:4', 'max:100'],
             'expires_at' => ['nullable', 'date'],
         ]);
 
+        if (! $this->isVideoShareable($video)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only public videos can be shared.',
+                'data' => null,
+                'errors' => ['video' => ['Only public videos can be shared.']],
+            ], 422);
+        }
+
         $share = $this->videoService->createShare(
             video: $video,
-            password: $validated['password'] ?? null,
+            password: null,
             expiresAt: $validated['expires_at'] ?? null,
         );
 
@@ -51,18 +60,12 @@ class VideoShareController extends Controller
             abort(404);
         }
 
-        $requiresPassword = $this->requiresPassword($video, $share);
-
         return response()->json([
             'success' => true,
             'message' => 'Share fetched successfully.',
             'data' => [
-                'requires_password' => $requiresPassword,
-                'video' => $requiresPassword ? [
-                    'uuid' => $video->uuid,
-                    'title' => $video->title,
-                    'thumbnail_url' => $video->thumbnail_url,
-                ] : new VideoResource($video),
+                'requires_password' => false,
+                'video' => new VideoResource($video),
             ],
             'errors' => null,
         ]);
@@ -81,26 +84,12 @@ class VideoShareController extends Controller
             abort(404);
         }
 
-        if (! $this->requiresPassword($video, $share)) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Password not required for this video.',
-                'data' => ['video' => new VideoResource($video)],
-                'errors' => null,
-            ]);
-        }
-
-        $validVideoPassword = $video->password_hash && Hash::check($validated['password'], $video->password_hash);
-        $validSharePassword = $share->password_hash && Hash::check($validated['password'], $share->password_hash);
-
-        abort_unless($validVideoPassword || $validSharePassword, 403);
-
         return response()->json([
-            'success' => true,
-            'message' => 'Password verified successfully.',
-            'data' => ['video' => new VideoResource($video)],
-            'errors' => null,
-        ]);
+            'success' => false,
+            'message' => 'Password verification is not supported for public shares.',
+            'data' => null,
+            'errors' => ['password' => ['Password verification is not supported for public shares.']],
+        ], 422);
     }
 
     private function isShareActive(VideoShare $share): bool
@@ -110,17 +99,6 @@ class VideoShareController extends Controller
 
     private function isVideoShareable(Video $video): bool
     {
-        return $video->privacy !== VideoPrivacy::Disabled;
-    }
-
-    private function requiresPassword(Video $video, VideoShare $share): bool
-    {
-        if ($video->privacy === VideoPrivacy::Public) {
-            return false;
-        }
-
-        return $video->privacy === VideoPrivacy::Password
-            || $video->password_hash !== null
-            || $share->password_hash !== null;
+        return $video->privacy === VideoPrivacy::Public;
     }
 }
