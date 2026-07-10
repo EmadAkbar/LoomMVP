@@ -8,6 +8,7 @@ use App\Models\Video;
 use App\Models\VideoShare;
 use App\Services\Cloudflare\CloudflareStreamService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -123,13 +124,36 @@ class VideoService
 
         $readyToStream = (bool) (data_get($payload, 'readyToStream') ?? data_get($payload, 'result.readyToStream'));
         $status = $readyToStream ? VideoStatus::Ready : VideoStatus::Processing;
+        $sizeBytes = $this->extractSizeBytes($payload) ?? $video->size_bytes;
+        $downloadUrl = $this->extractDownloadUrl($payload) ?? $video->download_url;
+
+        if ($readyToStream && (! $downloadUrl || ! $sizeBytes)) {
+            try {
+                $download = $this->cloudflareStreamService->createDownload((string) $uid);
+                $downloadUrl = $this->extractDownloadUrl($download) ?? $downloadUrl;
+
+                if (! $downloadUrl || ! $sizeBytes) {
+                    $cloudflareVideo = $this->cloudflareStreamService->getVideo((string) $uid);
+                    $downloadUrl = $this->extractDownloadUrl($cloudflareVideo) ?? $downloadUrl;
+                    $sizeBytes = $this->extractSizeBytes($cloudflareVideo) ?? $sizeBytes;
+                }
+            } catch (Throwable $exception) {
+                Log::channel('webhooks')->warning('Unable to resolve Cloudflare download URL or size during webhook sync.', [
+                    'uid' => $uid,
+                    'video_uuid' => $video->uuid,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         $video->update([
             'status' => $status,
             'processing_percentage' => $readyToStream ? 100 : 50,
             'duration_seconds' => (int) round((float) (data_get($payload, 'duration') ?? data_get($payload, 'result.duration') ?? 0)) ?: $video->duration_seconds,
+            'size_bytes' => $sizeBytes,
             'thumbnail_url' => data_get($payload, 'thumbnail') ?? data_get($payload, 'result.thumbnail') ?? $video->thumbnail_url,
             'playback_url' => data_get($payload, 'playback.hls') ?? data_get($payload, 'result.playback.hls') ?? $video->playback_url,
+            'download_url' => $downloadUrl,
             'cloudflare_meta' => $payload,
         ]);
 
@@ -153,5 +177,53 @@ class VideoService
         }
 
         return $slug;
+    }
+
+    private function extractSizeBytes(array $payload): ?int
+    {
+        $size = data_get($payload, 'size')
+            ?? data_get($payload, 'result.size')
+            ?? data_get($payload, 'maxSizeBytes')
+            ?? data_get($payload, 'result.maxSizeBytes');
+
+        if ($size === null || $size === '') {
+            return null;
+        }
+
+        $parsed = (int) $size;
+
+        return $parsed > 0 ? $parsed : null;
+    }
+
+    private function extractDownloadUrl(array $payload): ?string
+    {
+        $candidates = [
+            data_get($payload, 'download_url'),
+            data_get($payload, 'download.url'),
+            data_get($payload, 'download.urlSigned'),
+            data_get($payload, 'downloads.default.url'),
+            data_get($payload, 'downloads.0.url'),
+            data_get($payload, 'default.url'),
+            data_get($payload, 'default.urlSigned'),
+            data_get($payload, 'url'),
+            data_get($payload, 'urlSigned'),
+            data_get($payload, 'result.download_url'),
+            data_get($payload, 'result.download.url'),
+            data_get($payload, 'result.download.urlSigned'),
+            data_get($payload, 'result.downloads.default.url'),
+            data_get($payload, 'result.downloads.0.url'),
+            data_get($payload, 'result.default.url'),
+            data_get($payload, 'result.default.urlSigned'),
+            data_get($payload, 'result.url'),
+            data_get($payload, 'result.urlSigned'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return trim($candidate);
+            }
+        }
+
+        return null;
     }
 }
