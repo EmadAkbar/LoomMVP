@@ -45,7 +45,7 @@ class VideoShareController extends Controller
             'message' => 'Share link created successfully.',
             'data' => [
                 'share_uuid' => $share->share_uuid,
-                'share_url' => rtrim(config('app.frontend_url', env('FRONTEND_URL')), '/') . '/share/' . $share->share_uuid,
+                'share_url' => rtrim(config('app.frontend_url', env('FRONTEND_URL')), '/') . '/share/' . $video->uuid,
             ],
             'errors' => null,
         ], 201);
