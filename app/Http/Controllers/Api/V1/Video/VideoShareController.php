@@ -55,7 +55,12 @@ class VideoShareController extends Controller
             abort(404);
         }
 
-        $requiresPassword = $video->privacy === VideoPrivacy::Password || $share->password_hash !== null;
+        $isPublicVideo = $video->privacy === VideoPrivacy::Public;
+        $requiresPassword = ! $isPublicVideo && (
+            $video->privacy === VideoPrivacy::Password ||
+            $video->password_hash !== null ||
+            $share->password_hash !== null
+        );
 
         return response()->json([
             'success' => true,
@@ -87,6 +92,15 @@ class VideoShareController extends Controller
 
         if ($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private) {
             abort(404);
+        }
+
+        if ($video->privacy === VideoPrivacy::Public) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Password not required for public video.',
+                'data' => ['video' => new VideoResource($video)],
+                'errors' => null,
+            ]);
         }
 
         $validVideoPassword = $video->password_hash && Hash::check($validated['password'], $video->password_hash);

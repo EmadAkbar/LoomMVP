@@ -18,7 +18,7 @@ return new class extends Migration {
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('status')->default(VideoStatus::Uploading->value)->index();
-            $table->string('privacy')->default(VideoPrivacy::Private->value)->index();
+            $table->string('privacy')->default(VideoPrivacy::Public->value)->index();
             $table->string('password_hash')->nullable();
             $table->string('thumbnail_url')->nullable();
             $table->unsignedInteger('duration_seconds')->nullable();

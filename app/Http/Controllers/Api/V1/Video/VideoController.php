@@ -54,6 +54,14 @@ class VideoController extends Controller
     public function show(Request $request, Video $video): JsonResponse
     {
         // abort_unless($video->user_id === $request->user()->id, 403);
+        if($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Video is not accessible.',
+                'data' => null,
+                'errors' => ['video' => ['Video is not accessible.']],
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,

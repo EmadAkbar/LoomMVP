@@ -25,7 +25,7 @@ class VideoShareApiTest extends TestCase
             'title' => 'Shareable Video',
             'slug' => 'shareable-video',
             'status' => VideoStatus::Ready,
-            'privacy' => VideoPrivacy::Unlisted,
+            'privacy' => VideoPrivacy::Public,
         ]);
 
         Sanctum::actingAs($user);
@@ -43,14 +43,14 @@ class VideoShareApiTest extends TestCase
         ]);
     }
 
-    public function test_public_share_show_returns_video_for_unlisted_share(): void
+    public function test_public_share_show_returns_video_for_public_share_without_password_prompt(): void
     {
         $video = Video::query()->create([
             'user_id' => User::factory()->create()->id,
-            'title' => 'Public Unlisted',
-            'slug' => 'public-unlisted',
+            'title' => 'Public Video',
+            'slug' => 'public-video',
             'status' => VideoStatus::Ready,
-            'privacy' => VideoPrivacy::Unlisted,
+            'privacy' => VideoPrivacy::Public,
         ]);
 
         $share = VideoShare::query()->create([
@@ -61,6 +61,28 @@ class VideoShareApiTest extends TestCase
         $this->getJson('/api/v1/share/' . $share->share_uuid)
             ->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.requires_password', false)
+            ->assertJsonPath('data.video.uuid', $video->uuid);
+    }
+
+    public function test_public_share_ignores_share_level_password_prompt(): void
+    {
+        $video = Video::query()->create([
+            'user_id' => User::factory()->create()->id,
+            'title' => 'Public Video With Share Password',
+            'slug' => 'public-video-with-share-password',
+            'status' => VideoStatus::Ready,
+            'privacy' => VideoPrivacy::Public,
+        ]);
+
+        $share = VideoShare::query()->create([
+            'video_id' => $video->id,
+            'is_active' => true,
+            'password_hash' => Hash::make('1234'),
+        ]);
+
+        $this->getJson('/api/v1/share/' . $share->share_uuid)
+            ->assertOk()
             ->assertJsonPath('data.requires_password', false)
             ->assertJsonPath('data.video.uuid', $video->uuid);
     }

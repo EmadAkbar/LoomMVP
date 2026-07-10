@@ -36,7 +36,7 @@ class VideoService
             'description' => $description,
             'slug' => $this->uniqueSlug($title),
             'status' => VideoStatus::Uploading,
-            'privacy' => VideoPrivacy::Private,
+            'privacy' => VideoPrivacy::Public,
         ]);
 
         try {
