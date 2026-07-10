@@ -23,7 +23,10 @@ class CloudflareWebhookApiTest extends TestCase
     public function test_webhook_accepts_valid_signature_and_persists_event(): void
     {
         $secret = 'test-webhook-secret';
-        config(['cloudflare.stream_webhook_secret' => $secret]);
+        config([
+            'cloudflare.stream_webhook_secret' => $secret,
+            'cloudflare.webhook_signature_tolerance_seconds' => 300,
+        ]);
 
         $payload = [
             'uid' => 'video-uid-456',
@@ -32,7 +35,9 @@ class CloudflareWebhookApiTest extends TestCase
         ];
 
         $encodedPayload = json_encode($payload, JSON_THROW_ON_ERROR);
-        $signature = hash_hmac('sha256', $encodedPayload, $secret);
+        $timestamp = time();
+        $signatureSource = $timestamp . '.' . $encodedPayload;
+        $signature = hash_hmac('sha256', $signatureSource, $secret);
 
         $this->call(
             method: 'POST',
@@ -42,7 +47,7 @@ class CloudflareWebhookApiTest extends TestCase
             files: [],
             server: [
                 'CONTENT_TYPE' => 'application/json',
-                'HTTP_WEBHOOK_SIGNATURE' => $signature,
+                'HTTP_WEBHOOK_SIGNATURE' => 'time=' . $timestamp . ',sig1=' . $signature,
             ],
             content: $encodedPayload,
         )
@@ -57,5 +62,37 @@ class CloudflareWebhookApiTest extends TestCase
         ]);
 
         $this->assertSame(1, WebhookEvent::query()->count());
+    }
+
+    public function test_webhook_rejects_stale_signature_timestamp(): void
+    {
+        $secret = 'test-webhook-secret';
+        config([
+            'cloudflare.stream_webhook_secret' => $secret,
+            'cloudflare.webhook_signature_tolerance_seconds' => 300,
+        ]);
+
+        $payload = [
+            'uid' => 'video-uid-stale',
+            'event' => 'video.ready',
+        ];
+
+        $encodedPayload = json_encode($payload, JSON_THROW_ON_ERROR);
+        $timestamp = time() - 3600;
+        $signatureSource = $timestamp . '.' . $encodedPayload;
+        $signature = hash_hmac('sha256', $signatureSource, $secret);
+
+        $this->call(
+            method: 'POST',
+            uri: '/api/v1/webhooks/cloudflare',
+            parameters: [],
+            cookies: [],
+            files: [],
+            server: [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_WEBHOOK_SIGNATURE' => 'time=' . $timestamp . ',sig1=' . $signature,
+            ],
+            content: $encodedPayload,
+        )->assertUnauthorized();
     }
 }

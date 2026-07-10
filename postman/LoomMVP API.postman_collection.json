@@ -728,8 +728,10 @@
                   "var body = pm.request.body ? pm.request.body.raw : '';",
                   "var secret = pm.collectionVariables.get('webhook_secret');",
                   "if (secret && body) {",
-                  "    var signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
-                  "    pm.request.headers.upsert({ key: 'Webhook-Signature', value: signature });",
+                  "    var timestamp = Math.floor(Date.now() / 1000);",
+                  "    var signatureSource = timestamp + '.' + body;",
+                  "    var signature = CryptoJS.HmacSHA256(signatureSource, secret).toString(CryptoJS.enc.Hex);",
+                  "    pm.request.headers.upsert({ key: 'Webhook-Signature', value: 'time=' + timestamp + ',sig1=' + signature });",
                   "}"
                 ]
               }
