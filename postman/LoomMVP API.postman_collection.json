@@ -1,0 +1,776 @@
+{
+  "info": {
+    "_postman_id": "a6f2af1d-2c98-4d31-93f6-3c14d8f5b4b1",
+    "name": "LoomMVP API",
+    "description": "Postman collection for the current LoomMVP Laravel API. Import this collection and the companion environment file, then start with Register or Login. Collection variables are used to persist auth token, video UUID, share UUID, and upload UID across requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api"
+    },
+    {
+      "key": "auth_token",
+      "value": ""
+    },
+    {
+      "key": "video_uuid",
+      "value": ""
+    },
+    {
+      "key": "share_uuid",
+      "value": ""
+    },
+    {
+      "key": "upload_uid",
+      "value": ""
+    },
+    {
+      "key": "upload_url",
+      "value": ""
+    },
+    {
+      "key": "webhook_secret",
+      "value": ""
+    },
+    {
+      "key": "share_url",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Register returns success', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.token) {",
+                  "    pm.collectionVariables.set('auth_token', json.data.token);",
+                  "}",
+                  "if (json.data && json.data.user && json.data.user.email) {",
+                  "    pm.collectionVariables.set('registered_email', json.data.user.email);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"API Tester\",\n  \"email\": \"tester+{{$timestamp}}@example.com\",\n  \"password\": \"secret1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Create a new user account. The response token is stored in auth_token for later authenticated requests."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login returns success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.token) {",
+                  "    pm.collectionVariables.set('auth_token', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tester@example.com\",\n  \"password\": \"secret1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate an existing user. Stores the returned token in auth_token."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Fetch the authenticated user profile."
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout returns success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.collectionVariables.unset('auth_token');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalidate the current bearer token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Videos",
+      "item": [
+        {
+          "name": "List Videos",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/videos?per_page=12",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "12"
+                }
+              ]
+            },
+            "description": "List the authenticated user's videos."
+          }
+        },
+        {
+          "name": "Create Upload URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Upload URL created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.video && json.data.video.uuid) {",
+                  "    pm.collectionVariables.set('video_uuid', json.data.video.uuid);",
+                  "}",
+                  "if (json.data && json.data.upload_url) {",
+                  "    pm.collectionVariables.set('upload_url', json.data.upload_url);",
+                  "}",
+                  "if (json.data && json.data.upload_uid) {",
+                  "    pm.collectionVariables.set('upload_uid', json.data.upload_uid);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Intro walkthrough\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/videos/upload-url",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "upload-url"
+              ]
+            },
+            "description": "Create a direct Cloudflare Stream upload URL. Saves the returned video_uuid, upload_url, and upload_uid in collection variables."
+          }
+        },
+        {
+          "name": "Upload Video File To Cloudflare",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{upload_url}}",
+              "host": [
+                "{{upload_url}}"
+              ]
+            },
+            "description": "Upload a local MP4 file directly to Cloudflare using the one-time upload_url returned by Create Upload URL. In Postman, choose a file in Body > form-data before sending. For files above 200 MB, this basic POST flow is not suitable; use tus instead."
+          }
+        },
+        {
+          "name": "Get Video",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/videos/{{video_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "{{video_uuid}}"
+              ]
+            },
+            "description": "Fetch a single video by UUID."
+          }
+        },
+        {
+          "name": "Update Video",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated walkthrough\",\n  \"description\": \"Short Loom-style walkthrough for the client.\",\n  \"privacy\": \"unlisted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/videos/{{video_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "{{video_uuid}}"
+              ]
+            },
+            "description": "Update video metadata. Supported privacy values: private, unlisted, password, disabled. If using password privacy, also send password."
+          }
+        },
+        {
+          "name": "Delete Video",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/videos/{{video_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "{{video_uuid}}"
+              ]
+            },
+            "description": "Soft-delete a video and remove it from Cloudflare if cloudflare_uid exists."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comments",
+      "item": [
+        {
+          "name": "List Video Comments",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/videos/{{video_uuid}}/comments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "{{video_uuid}}",
+                "comments"
+              ]
+            },
+            "description": "List comments for a video owned by the authenticated user."
+          }
+        },
+        {
+          "name": "Create Video Comment",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_name\": \"Client Reviewer\",\n  \"comment\": \"Please revisit this section.\",\n  \"timestamp_seconds\": 134\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/videos/{{video_uuid}}/comments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "{{video_uuid}}",
+                "comments"
+              ]
+            },
+            "description": "Create a timestamped comment on the selected video."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shares",
+      "item": [
+        {
+          "name": "Create Share Link",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Share link created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.share_uuid) {",
+                  "    pm.collectionVariables.set('share_uuid', json.data.share_uuid);",
+                  "}",
+                  "if (json.data && json.data.share_url) {",
+                  "    pm.collectionVariables.set('share_url', json.data.share_url);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"1234\",\n  \"expires_at\": \"2026-12-31 23:59:59\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/videos/{{video_uuid}}/shares",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "videos",
+                "{{video_uuid}}",
+                "shares"
+              ]
+            },
+            "description": "Create a share link for a video. Saves share_uuid and share_url for the public share endpoints. Make sure the video privacy is updated from private to unlisted or password before expecting the public link to resolve."
+          }
+        },
+        {
+          "name": "Public Share Show",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/share/{{share_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "share",
+                "{{share_uuid}}"
+              ]
+            },
+            "description": "Fetch the public share page data. Returns either the full video resource or a password prompt payload depending on privacy configuration."
+          }
+        },
+        {
+          "name": "Verify Share Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/share/{{share_uuid}}/verify-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "share",
+                "{{share_uuid}}",
+                "verify-password"
+              ]
+            },
+            "description": "Verify a password-protected share or a video-level password before exposing the full video resource."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Cloudflare Stream Webhook",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var body = pm.request.body ? pm.request.body.raw : '';",
+                  "var secret = pm.collectionVariables.get('webhook_secret');",
+                  "if (secret && body) {",
+                  "    var signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "    pm.request.headers.upsert({ key: 'Webhook-Signature', value: signature });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uid\": \"{{upload_uid}}\",\n  \"event\": \"video.ready\",\n  \"readyToStream\": true,\n  \"duration\": 128,\n  \"thumbnail\": \"https://videodelivery.net/example/thumbnails/thumbnail.jpg\",\n  \"playback\": {\n    \"hls\": \"https://videodelivery.net/example/manifest/video.m3u8\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/webhooks/cloudflare",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "webhooks",
+                "cloudflare"
+              ]
+            },
+            "description": "Simulate a Cloudflare Stream webhook. Set webhook_secret to the same value as CLOUDFLARE_STREAM_WEBHOOK_SECRET before sending if signature verification is enabled."
+          }
+        }
+      ]
+    }
+  ]
+}
