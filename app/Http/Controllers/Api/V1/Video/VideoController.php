@@ -54,13 +54,36 @@ class VideoController extends Controller
 
     public function show(Request $request, Video $video): JsonResponse
     {
-        // abort_unless($video->user_id === $request->user()->id, 403);
-        if($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private || $video->status !== VideoStatus::Ready) {
+        $user = $request->user();
+        $isOwner = $user && $user->id == $video->user_id;
+
+        // Video must be ready for everyone (including the owner)
+        if ($video->status !== VideoStatus::Ready) {
             return response()->json([
                 'success' => false,
                 'message' => 'Video is not accessible.',
                 'data' => null,
-                'errors' => ['video' => ['Video is not accessible.']],
+                'errors' => [
+                    'video' => ['Video is not accessible.']
+                ],
+            ], 404);
+        }
+
+        // Only the owner can view private or disabled videos
+        if (
+            !$isOwner &&
+            in_array($video->privacy, [
+                VideoPrivacy::Private,
+                VideoPrivacy::Disabled,
+            ])
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Video is not accessible.',
+                'data' => null,
+                'errors' => [
+                    'video' => ['Video is not accessible.']
+                ],
             ], 404);
         }
 
@@ -69,7 +92,7 @@ class VideoController extends Controller
             'message' => 'Video fetched successfully.',
             'data' => [
                 'video' => new VideoResource($video),
-                'share_url' => rtrim(config('app.frontend_url', env('FRONTEND_URL')), '/') . '/share/' . $video->uuid
+                'share_url' => rtrim(config('app.frontend_url', env('FRONTEND_URL')), '/') . '/share/' . $video->uuid,
             ],
             'errors' => null,
         ]);
