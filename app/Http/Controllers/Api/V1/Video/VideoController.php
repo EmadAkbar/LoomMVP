@@ -12,6 +12,7 @@ use App\Models\Video;
 use App\Services\Video\VideoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class VideoController extends Controller
 {
@@ -54,7 +55,12 @@ class VideoController extends Controller
 
     public function show(Request $request, Video $video): JsonResponse
     {
-        $user = $request->user();
+        if ($token = $request->bearerToken()) {
+            Auth::guard('sanctum')->setRequest($request);
+            Auth::guard('sanctum')->user();
+        }
+
+        $user = Auth::guard('sanctum')->user();
         $isOwner = $user && $user->id == $video->user_id;
 
         // Video must be ready for everyone (including the owner)
