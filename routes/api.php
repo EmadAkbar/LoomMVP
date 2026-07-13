@@ -29,12 +29,12 @@ Route::prefix('v1')->group(function () {
         Route::patch('/videos/{video:uuid}', [VideoController::class, 'update']);
         Route::delete('/videos/{video:uuid}', [VideoController::class, 'destroy']);
 
-        Route::get('/videos/{video:uuid}/comments', [VideoCommentController::class, 'index']);
-        Route::post('/videos/{video:uuid}/comments', [VideoCommentController::class, 'store']);
+        Route::match(['post', 'put'], '/videos/{video:uuid}/comments', [VideoCommentController::class, 'store']);
 
         Route::post('/videos/{video:uuid}/shares', [VideoShareController::class, 'store']);
     });
 
+    Route::get('/videos/{video:uuid}/comments', [VideoCommentController::class, 'index']);
     Route::get('/videos/{video:uuid}', [VideoController::class, 'show']);
 
     Route::middleware('throttle:120,1')->get('/share/{share:share_uuid}', [VideoShareController::class, 'show']);
