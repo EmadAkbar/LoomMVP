@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Video;
 
 use App\Enums\VideoPrivacy;
+use App\Enums\VideoStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Video\CreateUploadUrlRequest;
 use App\Http\Requests\Video\UpdateVideoRequest;
@@ -54,19 +55,24 @@ class VideoController extends Controller
     public function show(Request $request, Video $video): JsonResponse
     {
         // abort_unless($video->user_id === $request->user()->id, 403);
-        if($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Video is not accessible.',
-                'data' => null,
-                'errors' => ['video' => ['Video is not accessible.']],
-            ], 404);
+        if($video->user_id != $request->user()->id) {
+            if($video->privacy === VideoPrivacy::Disabled || $video->privacy === VideoPrivacy::Private || $video->status !== VideoStatus::Ready) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Video is not accessible.',
+                    'data' => null,
+                    'errors' => ['video' => ['Video is not accessible.']],
+                ], 404);
+            }
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Video fetched successfully.',
-            'data' => ['video' => new VideoResource($video)],
+            'data' => [
+                'video' => new VideoResource($video),
+                'share_url' => rtrim(config('app.frontend_url', env('FRONTEND_URL')), '/') . '/share/' . $video->uuid
+            ],
             'errors' => null,
         ]);
     }
