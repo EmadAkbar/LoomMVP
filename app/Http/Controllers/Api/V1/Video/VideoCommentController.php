@@ -14,13 +14,13 @@ class VideoCommentController extends Controller
 {
     public function index(Request $request, Video $video): JsonResponse
     {
-        if ($request->bearerToken()) {
-            Auth::guard('sanctum')->setRequest($request);
-            Auth::guard('sanctum')->user();
-        }
+        // if ($request->bearerToken()) {
+        //     Auth::guard('sanctum')->setRequest($request);
+        //     Auth::guard('sanctum')->user();
+        // }
 
-        $user = Auth::guard('sanctum')->user();
-        abort_unless($video->user_id == $user?->id, 403);
+        // $user = Auth::guard('sanctum')->user();
+        // if($user) abort_unless($video->user_id == $user?->id, 403);
 
         $comments = $video->comments()->oldest('timestamp_seconds')->get();
 
