@@ -29,7 +29,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('/videos/{video:uuid}', [VideoController::class, 'update']);
         Route::delete('/videos/{video:uuid}', [VideoController::class, 'destroy']);
 
-        Route::match(['post', 'put'], '/videos/{video:uuid}/comments', [VideoCommentController::class, 'store']);
+        Route::post('/videos/{video:uuid}/comments', [VideoCommentController::class, 'store']);
 
         Route::post('/videos/{video:uuid}/shares', [VideoShareController::class, 'store']);
     });
