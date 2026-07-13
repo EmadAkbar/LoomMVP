@@ -8,12 +8,19 @@ use App\Http\Resources\VideoCommentResource;
 use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class VideoCommentController extends Controller
 {
     public function index(Request $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id == $request->user()->id, 403);
+        if ($request->bearerToken()) {
+            Auth::guard('sanctum')->setRequest($request);
+            Auth::guard('sanctum')->user();
+        }
+
+        $user = Auth::guard('sanctum')->user();
+        abort_unless($video->user_id == $user?->id, 403);
 
         $comments = $video->comments()->oldest('timestamp_seconds')->get();
 
