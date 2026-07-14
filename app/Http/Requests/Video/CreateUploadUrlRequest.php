@@ -15,6 +15,9 @@ class CreateUploadUrlRequest extends FormRequest
     {
         return [
             'title' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'duration_seconds' => ['nullable', 'integer', 'min:0'],
+            'size_bytes' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }
