@@ -64,16 +64,16 @@ class VideoController extends Controller
         $isOwner = $user && $user->id == $video->user_id;
 
         // Video must be ready for everyone (including the owner)
-        if ($video->status !== VideoStatus::Ready) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Video is not accessible.',
-                'data' => null,
-                'errors' => [
-                    'video' => ['Video is not accessible.']
-                ],
-            ], 404);
-        }
+        // if ($video->status !== VideoStatus::Ready) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'Video is not accessible.',
+        //         'data' => null,
+        //         'errors' => [
+        //             'video' => ['Video is not accessible.']
+        //         ],
+        //     ], 404);
+        // }
 
         // Only the owner can view private or disabled videos
         if (
