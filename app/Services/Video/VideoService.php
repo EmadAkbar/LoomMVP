@@ -164,6 +164,9 @@ class VideoService
 
     private function uniqueSlug(string $title, ?int $ignoreId = null): string
     {
+        $slug = Str::slug($title) . '-' . Str::lower(Str::random(6));
+        return $slug;
+
         $baseSlug = Str::slug($title) ?: 'video';
         $slug = $baseSlug;
         $counter = 2;
