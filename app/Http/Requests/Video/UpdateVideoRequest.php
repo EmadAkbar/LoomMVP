@@ -19,6 +19,8 @@ class UpdateVideoRequest extends FormRequest
             'description' => ['sometimes', 'nullable', 'string'],
             'privacy' => ['sometimes', 'required', Rule::in(['public', 'private', 'unlisted', 'password', 'disabled'])],
             'password' => ['sometimes', 'nullable', 'string', 'min:4', 'max:100'],
+            'duration_seconds' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'size_bytes' => ['sometimes', 'nullable', 'integer', 'min:0'],
         ];
     }
 }
