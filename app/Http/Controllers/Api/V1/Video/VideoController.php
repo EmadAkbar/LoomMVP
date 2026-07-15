@@ -20,9 +20,24 @@ class VideoController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $privacy = $request->string('privacy', '');
+
+        if($privacy !== '' && ! in_array($privacy, array_map(fn($case) => $case->value, VideoPrivacy::cases()))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid privacy filter.',
+                'data' => null,
+                'errors' => [
+                    'privacy' => ['Invalid privacy filter.']
+                ],
+            ], 422);
+        }
+
         $videos = $this->videoService->paginateForUser(
             userId: $request->user()->id,
-            perPage: (int) $request->integer('per_page', 12)
+            perPage: (int) $request->integer('per_page', 12),
+            search: $request->string('search', ''),
+            privacy: $privacy,
         );
 
         return response()->json([

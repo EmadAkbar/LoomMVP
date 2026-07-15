@@ -20,10 +20,16 @@ class VideoService
         private readonly CloudflareStreamService $cloudflareStreamService
     ) {}
 
-    public function paginateForUser(int $userId, int $perPage = 12): LengthAwarePaginator
+    public function paginateForUser(int $userId, int $perPage = 12, string $search = '', string $privacy = ''): LengthAwarePaginator
     {
         return Video::query()
             ->where('user_id', $userId)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where('title', 'like', "%{$search}%");
+            })
+            ->when($privacy !== '', function ($query) use ($privacy) {
+                $query->where('privacy', $privacy);
+            })
             ->latest()
             ->paginate($perPage);
     }
