@@ -22,7 +22,7 @@ class VideoController extends Controller
     {
         $privacy = $request->string('privacy', '');
 
-        if($privacy !== '' && ! in_array($privacy, array_map(fn($case) => $case->value, VideoPrivacy::cases()))) {
+        if($privacy != '' && ! in_array($privacy, array_map(fn($case) => $case->value, VideoPrivacy::cases()))) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid privacy filter.',
