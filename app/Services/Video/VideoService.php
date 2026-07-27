@@ -30,7 +30,7 @@ class VideoService
             ->when($privacy !== '', function ($query) use ($privacy) {
                 $query->where('privacy', $privacy);
             })
-            ->withCount(['views', 'favorites'])
+            ->withCount(['views', 'favoritedBy'])
             ->latest()
             ->paginate($perPage);
     }
