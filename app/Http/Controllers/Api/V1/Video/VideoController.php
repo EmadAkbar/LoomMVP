@@ -40,9 +40,12 @@ class VideoController extends Controller
             privacy: $privacy,
         );
 
+        $stats = $this->videoService->getViewStats($request->user()->id);
+
         return response()->json([
             'success' => true,
             'message' => 'Videos fetched successfully.',
+            'activity_overview' => $stats,
             'data' => VideoResource::collection($videos)->response()->getData(true),
             'errors' => null,
         ]);

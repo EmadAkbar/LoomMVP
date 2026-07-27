@@ -6,11 +6,13 @@ use App\Enums\VideoPrivacy;
 use App\Enums\VideoStatus;
 use App\Models\Video;
 use App\Models\VideoShare;
+use App\Models\VideoView;
 use App\Services\Cloudflare\CloudflareStreamService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Ramsey\Collection\Collection;
 use RuntimeException;
 use Throwable;
 
@@ -237,5 +239,35 @@ class VideoService
         }
 
         return null;
+    }
+
+    public function getViewStats(int $userId): array
+    {
+        $videoIds = Video::query()
+            ->where('user_id', $userId)
+            ->pluck('id');
+
+        $baseQuery = VideoView::query()->whereIn('video_id', $videoIds);
+
+        return [
+            'today' => (clone $baseQuery)
+                ->whereDate('created_at', today())
+                ->count(),
+
+            'this_week' => (clone $baseQuery)
+                ->whereBetween('created_at', [
+                    now()->startOfWeek(),
+                    now()->endOfWeek(),
+                ])
+                ->count(),
+
+            'this_month' => (clone $baseQuery)
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->count(),
+
+            'all_time' => (clone $baseQuery)
+                ->count(),
+        ];
     }
 }
