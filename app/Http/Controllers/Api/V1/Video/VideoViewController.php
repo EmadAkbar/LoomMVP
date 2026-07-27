@@ -16,7 +16,7 @@ class VideoViewController extends Controller
     public function store(Request $request, Video $video): JsonResponse
     {
         $user = $request->user('sanctum');
-        $isOwner = $user && $user->id === $video->user_id;
+        $isOwner = $user && $user->id == $video->user_id;
 
         if (! $isOwner && in_array($video->privacy, [VideoPrivacy::Private, VideoPrivacy::Disabled], true)) {
             return response()->json([
@@ -54,7 +54,7 @@ class VideoViewController extends Controller
 
     public function insights(Request $request, Video $video): JsonResponse
     {
-        abort_unless($video->user_id === $request->user()->id, 403);
+        abort_unless($video->user_id == $request->user()->id, 403);
 
         $validated = $request->validate([
             'days' => ['nullable', 'integer', 'min:1', 'max:365'],
