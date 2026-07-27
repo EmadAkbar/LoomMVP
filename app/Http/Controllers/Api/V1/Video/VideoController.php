@@ -108,6 +108,8 @@ class VideoController extends Controller
             ], 404);
         }
 
+        $video->loadCount('views', 'favorites');
+
         return response()->json([
             'success' => true,
             'message' => 'Video fetched successfully.',
