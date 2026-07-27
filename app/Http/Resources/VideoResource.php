@@ -25,7 +25,7 @@ class VideoResource extends JsonResource
             'processing_percentage' => $this->processing_percentage,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
-            'views' => $this->views,
+            'views' => (int) $this->views_count,
         ];
     }
 }
