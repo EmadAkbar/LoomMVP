@@ -16,6 +16,7 @@ class VideoFavoriteController extends Controller
         $videos = $request->user()
             ->favoriteVideos()
             ->latest('video_favorites.created_at')
+            ->withCount('views', 'favoritedBy')
             ->paginate((int) $request->integer('per_page', 12));
 
         return response()->json([
