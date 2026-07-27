@@ -26,21 +26,22 @@ class VideoViewService
 
         $viewerFingerprint = hash('sha256', $fingerprintSource);
 
-        $isUniqueViewer = !VideoView::query()
-            ->where('video_id', $video->id)
-            ->where('viewer_fingerprint', $viewerFingerprint)
-            ->exists();
-
-        $view = null;
-
-        if ($isUniqueViewer) {
-            $view = $video->views()->create([
+        $view = VideoView::firstOrCreate(
+            [
+                'video_id' => $video->id,
+                'viewer_fingerprint' => $viewerFingerprint,
+            ],
+            [
                 'viewer_ip' => $viewerIp,
                 'viewer_agent' => $viewerAgent,
                 'viewer_device_id' => $deviceId,
-                'viewer_fingerprint' => $viewerFingerprint,
                 'watch_seconds' => max(0, $watchSeconds),
-            ]);
+            ]
+        );
+
+        $isUniqueViewer = $view->wasRecentlyCreated;
+
+        if ($isUniqueViewer) {
             $this->notifyAdminsForUniqueView($video, $view);
         }
 
