@@ -6,25 +6,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class VideoView extends Model
+class VideoFavorite extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'video_id',
-        'viewer_ip',
-        'viewer_agent',
-        'viewer_device_id',
-        'viewer_fingerprint',
-        'watch_seconds',
-    ];
-
-    protected $casts = [
-        'watch_seconds' => 'integer',
+        'user_id',
     ];
 
     public function video(): BelongsTo
     {
         return $this->belongsTo(Video::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

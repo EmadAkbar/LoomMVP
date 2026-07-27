@@ -3,7 +3,9 @@
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Video\VideoCommentController;
 use App\Http\Controllers\Api\V1\Video\VideoController;
+use App\Http\Controllers\Api\V1\Video\VideoFavoriteController;
 use App\Http\Controllers\Api\V1\Video\VideoShareController;
+use App\Http\Controllers\Api\V1\Video\VideoViewController;
 use App\Http\Controllers\Api\V1\Webhook\CloudflareWebhookController;
 use App\Http\Middleware\VerifyCloudflareWebhookSignature;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +30,10 @@ Route::prefix('v1')->group(function () {
 
         Route::patch('/videos/{video:uuid}', [VideoController::class, 'update']);
         Route::delete('/videos/{video:uuid}', [VideoController::class, 'destroy']);
+        Route::get('/videos/{video:uuid}/insights/views', [VideoViewController::class, 'insights']);
+        Route::post('/videos/{video:uuid}/favorite', [VideoFavoriteController::class, 'store']);
+        Route::delete('/videos/{video:uuid}/favorite', [VideoFavoriteController::class, 'destroy']);
+        Route::get('/favorites/videos', [VideoFavoriteController::class, 'index']);
 
         Route::post('/videos/{video:uuid}/comments', [VideoCommentController::class, 'store']);
 
@@ -36,6 +42,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/videos/{video:uuid}/comments', [VideoCommentController::class, 'index']);
     Route::get('/videos/{video:uuid}', [VideoController::class, 'show']);
+    Route::middleware('throttle:120,1')->post('/videos/{video:uuid}/views', [VideoViewController::class, 'store']);
 
     Route::middleware('throttle:120,1')->get('/share/{share:share_uuid}', [VideoShareController::class, 'show']);
     Route::middleware('throttle:20,1')->post('/share/{share:share_uuid}/verify-password', [VideoShareController::class, 'verifyPassword']);

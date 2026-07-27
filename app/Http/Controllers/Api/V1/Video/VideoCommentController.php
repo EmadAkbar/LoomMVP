@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api\V1\Video;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Video\CreateCommentRequest;
 use App\Http\Resources\VideoCommentResource;
+use App\Mail\VideoCommentNotificationMail;
 use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class VideoCommentController extends Controller
 {
@@ -40,6 +41,17 @@ class VideoCommentController extends Controller
             'comment' => $request->input('comment'),
             'timestamp_seconds' => $request->integer('timestamp_seconds'),
         ]);
+
+        $video->loadMissing('user');
+        $owner = $video->user;
+
+        if (
+            $owner &&
+            $owner->email &&
+            (! $request->user() || $request->user()->id != $owner->id)
+        ) {
+            Mail::to($owner->email)->send(new VideoCommentNotificationMail($video, $comment));
+        }
 
         return response()->json([
             'success' => true,
