@@ -17,7 +17,7 @@ class UniqueVideoViewAlertMail extends Mailable
 
     public function __construct(
         public readonly Video $video,
-        public readonly VideoView $view,
+        public readonly VideoView $videoView,
     ) {}
 
     public function envelope(): Envelope
@@ -33,7 +33,7 @@ class UniqueVideoViewAlertMail extends Mailable
             view: 'emails.video-viewed',
             with: [
                 'video' => $this->video,
-                'view' => $this->view,
+                'view' => $this->videoView,
             ],
         );
     }
