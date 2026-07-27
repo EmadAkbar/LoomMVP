@@ -26,7 +26,7 @@ class VideoResource extends JsonResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'views' => (int) $this->views_count,
-            'favorites' => (int) ($this->favorites_count ?? 0),
+            'favorites' => (int) ($this->favorited_by_count ?? 0),
         ];
     }
 }

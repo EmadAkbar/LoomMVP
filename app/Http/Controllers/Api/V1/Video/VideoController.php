@@ -108,7 +108,7 @@ class VideoController extends Controller
             ], 404);
         }
 
-        $video->loadCount('views', 'favorites');
+        $video->loadCount('views', 'favoritedBy');
 
         return response()->json([
             'success' => true,
