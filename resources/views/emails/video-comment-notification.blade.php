@@ -71,7 +71,7 @@
                                                         <tr>
                                                             <td colspan="2" valign="top" style="padding:0;">
                                                                 <p style="margin:0 0 4px; color:#77839a; font-size:12px;">Created at</p>
-                                                                <p style="margin:0; color:#172033; font-size:14px; line-height:20px;">{{ $comment->created_at?->toDateTimeString() }}</p>
+                                                                <p style="margin:0; color:#172033; font-size:14px; line-height:20px;">{{ $comment->created_at?->format('d M Y, h:i A') }}</p>
                                                             </td>
                                                         </tr>
                                                     </table>
