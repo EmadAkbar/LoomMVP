@@ -71,6 +71,34 @@ class VideoController extends Controller
         ], 201);
     }
 
+    public function createTusUploadUrl(CreateUploadUrlRequest $request): JsonResponse
+    {
+        $result = $this->videoService->createTusUploadUrl(
+            userId: $request->user()->id,
+            title: $request->input('title', 'Untitled Video'),
+            description: $request->input('description'),
+            fileName: $request->string('file_name')->toString(),
+            fileSize: $request->integer('file_size'),
+            fileType: $request->input('file_type', 'video/webm'),
+            maxDurationSeconds: $request->integer(
+                'max_duration_seconds',
+                7200
+            ),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Resumable upload URL created successfully.',
+            'data' => [
+                'video' => new VideoResource($result['video']),
+                'upload_url' => $result['upload_url'],
+                'upload_uid' => $result['upload_uid'],
+                'upload_protocol' => 'tus',
+            ],
+            'errors' => null,
+        ], 201);
+    }
+
     public function show(Request $request, Video $video): JsonResponse
     {
         if ($token = $request->bearerToken()) {

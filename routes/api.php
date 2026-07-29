@@ -27,6 +27,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/videos', [VideoController::class, 'index']);
         Route::post('/videos/upload-url', [VideoController::class, 'createUploadUrl']);
+        Route::post('/videos/tus-upload-url', [VideoController::class, 'createTusUploadUrl']);
 
         Route::patch('/videos/{video:uuid}', [VideoController::class, 'update']);
         Route::delete('/videos/{video:uuid}', [VideoController::class, 'destroy']);

@@ -92,4 +92,82 @@ class CloudflareStreamService
             throw new RuntimeException('Cloudflare Stream credentials are not configured.');
         }
     }
+
+    public function createTusUploadUrl(
+        int $fileSize,
+        string $fileName,
+        string $fileType,
+        string $creatorId,
+        int $maxDurationSeconds = 7200,
+    ): array {
+        $accountId = config('cloudflare.account_id');
+        $apiToken = config('cloudflare.stream_api_token');
+
+        if (! $accountId || ! $apiToken) {
+            throw new RuntimeException(
+                'Cloudflare Stream credentials are not configured.'
+            );
+        }
+
+        $metadata = $this->buildTusMetadata([
+            'name' => $fileName,
+            'filetype' => $fileType,
+            'maxdurationseconds' => (string) $maxDurationSeconds,
+        ]);
+
+        $response = Http::withToken($apiToken)
+            ->withHeaders([
+                'Tus-Resumable' => '1.0.0',
+                'Upload-Length' => (string) $fileSize,
+                'Upload-Metadata' => $metadata,
+                'Upload-Creator' => $creatorId,
+            ])
+            ->post(
+                "https://api.cloudflare.com/client/v4/accounts/{$accountId}/stream",
+                [
+                    'direct_user' => true,
+                ]
+            );
+
+        /*
+         * Depending on Laravel HTTP-client behavior, query parameters should
+         * preferably be added through withOptions/query as shown below.
+         */
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                'Cloudflare tus endpoint creation failed: '.
+                $response->body()
+            );
+        }
+
+        $uploadUrl = $response->header('Location');
+        $streamMediaId = $response->header('stream-media-id');
+
+        if (! $uploadUrl || ! $streamMediaId) {
+            throw new RuntimeException(
+                'Cloudflare did not return the tus upload URL or media ID.'
+            );
+        }
+
+        return [
+            'uploadURL' => $uploadUrl,
+            'uid' => $streamMediaId,
+            'headers' => $response->headers(),
+        ];
+    }
+
+    private function buildTusMetadata(array $metadata): string
+    {
+        return collect($metadata)
+            ->filter(
+                fn ($value) =>
+                    $value !== null &&
+                    $value !== ''
+            )
+            ->map(
+                fn ($value, $key) =>
+                    $key.' '.base64_encode((string) $value)
+            )
+            ->implode(',');
+    }
 }

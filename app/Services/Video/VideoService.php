@@ -82,6 +82,71 @@ class VideoService
         ];
     }
 
+    public function createTusUploadUrl( int $userId, string $title, ?string $description, string $fileName, int $fileSize, string $fileType = 'video/webm', int $maxDurationSeconds = 7200 ): array
+    {
+        $video = Video::query()->create([
+            'user_id' => $userId,
+            'title' => $title,
+            'description' => $description,
+            'slug' => $this->uniqueSlug($title),
+            'status' => VideoStatus::Uploading,
+            'privacy' => VideoPrivacy::Public,
+            'size_bytes' => $fileSize,
+        ]);
+
+        try {
+            $directUpload =
+                $this->cloudflareStreamService->createTusUploadUrl(
+                    fileSize: $fileSize,
+                    fileName: $fileName,
+                    fileType: $fileType,
+                    creatorId: (string) $userId,
+                    maxDurationSeconds: $maxDurationSeconds,
+                );
+
+            $cloudflareUid = $directUpload['uid'] ?? null;
+            $uploadUrl = $directUpload['uploadURL'] ?? null;
+
+            if (
+                ! is_string($cloudflareUid) ||
+                $cloudflareUid === '' ||
+                ! is_string($uploadUrl) ||
+                $uploadUrl === ''
+            ) {
+                throw new RuntimeException(
+                    'Cloudflare tus response is missing required values.'
+                );
+            }
+
+            $video->update([
+                'upload_uid' => $cloudflareUid,
+                'cloudflare_uid' => $cloudflareUid,
+                'cloudflare_meta' => [
+                    'upload_protocol' => 'tus',
+                    'file_name' => $fileName,
+                    'file_type' => $fileType,
+                    'file_size' => $fileSize,
+                    'max_duration_seconds' => $maxDurationSeconds,
+                ],
+            ]);
+
+            return [
+                'video' => $video->refresh(),
+                'upload_url' => $uploadUrl,
+                'upload_uid' => $cloudflareUid,
+            ];
+        } catch (Throwable $exception) {
+            $video->forceDelete();
+
+            report($exception);
+
+            throw new RuntimeException(
+                'Unable to create resumable upload URL. Please retry.',
+                previous: $exception,
+            );
+        }
+    }
+
     public function update(Video $video, array $data): Video
     {
         if (isset($data['title']) && $data['title'] !== $video->title) {
