@@ -29,6 +29,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/videos/upload-url', [VideoController::class, 'createUploadUrl']);
         Route::post('/videos/tus-upload-url', [VideoController::class, 'createTusUploadUrl']);
 
+        // Called repeatedly while a single upload is in flight, so it sits outside
+        // the generic update endpoint: it accepts only a percentage and can never
+        // promote a video to ready.
+        Route::patch('/videos/{video:uuid}/upload-progress', [VideoController::class, 'updateUploadProgress']);
+
         Route::patch('/videos/{video:uuid}', [VideoController::class, 'update']);
         Route::delete('/videos/{video:uuid}', [VideoController::class, 'destroy']);
         Route::get('/videos/{video:uuid}/insights/views', [VideoViewController::class, 'insights']);

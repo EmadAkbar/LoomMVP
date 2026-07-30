@@ -45,6 +45,30 @@ class CloudflareStreamService
         return $response->json('result');
     }
 
+    /**
+     * Like getVideo(), but tells "Cloudflare has no such video" apart from "the
+     * call failed". A 404 is a real answer — the upload was abandoned or expired
+     * and no amount of retrying will change it — whereas a network error means try
+     * again later. getVideo() collapses both into one exception, and callers that
+     * act on the difference need them separated.
+     */
+    public function findVideo(string $uid): ?array
+    {
+        $this->assertConfigured();
+
+        $response = $this->client()->get($this->baseUrl() . '/' . $uid);
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        if ($response->failed()) {
+            throw new RuntimeException('Unable to fetch Cloudflare video: ' . $response->body());
+        }
+
+        return $response->json('result');
+    }
+
     public function deleteVideo(string $uid): void
     {
         $this->assertConfigured();
@@ -72,6 +96,11 @@ class CloudflareStreamService
     private function client(): PendingRequest
     {
         return Http::withToken((string) config('cloudflare.stream_api_token'))
+            // Laravel's default is no timeout at all. These calls now also run from
+            // post-response reconciliation, where a hung connection would hold the
+            // worker open indefinitely instead of just delaying one request.
+            ->connectTimeout(5)
+            ->timeout(15)
             ->acceptJson()
             ->asJson();
     }

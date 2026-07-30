@@ -6,6 +6,7 @@ use App\Enums\VideoPrivacy;
 use App\Enums\VideoStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Video\CreateUploadUrlRequest;
+use App\Http\Requests\Video\UpdateUploadProgressRequest;
 use App\Http\Requests\Video\UpdateVideoRequest;
 use App\Http\Resources\VideoResource;
 use App\Models\Video;
@@ -99,6 +100,36 @@ class VideoController extends Controller
         ], 201);
     }
 
+    /**
+     * Record real upload progress for a video whose bytes are still in flight.
+     *
+     * Intentionally lean — the browser calls this repeatedly during a single
+     * upload, so it returns just the two fields that can have changed rather than
+     * a full VideoResource (which would add two count queries per ping). Echoing
+     * the authoritative status back also means the uploader learns about a webhook
+     * transition from the same request, without a separate poll.
+     */
+    public function updateUploadProgress(UpdateUploadProgressRequest $request, Video $video): JsonResponse
+    {
+        abort_unless($video->user_id == $request->user()->id, 403);
+
+        $video = $this->videoService->recordUploadProgress(
+            $video,
+            (int) $request->integer('processing_percentage'),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Upload progress updated.',
+            'data' => [
+                'uuid' => $video->uuid,
+                'status' => $video->status?->value ?? $video->status,
+                'processing_percentage' => (int) $video->processing_percentage,
+            ],
+            'errors' => null,
+        ]);
+    }
+
     public function show(Request $request, Video $video): JsonResponse
     {
         if ($token = $request->bearerToken()) {
@@ -140,6 +171,16 @@ class VideoController extends Controller
         }
 
         $video->loadCount('views', 'favoritedBy');
+
+        // A video that has not settled yet gets reconciled against Cloudflare, so
+        // a webhook that never arrived cannot leave it stuck at "uploading 100%".
+        // Deliberately after the response: this endpoint is what the preview and
+        // share pages poll, so the reconcile must never make that poll slower. The
+        // fresh status lands in the row and the next poll — a few seconds later —
+        // picks it up.
+        app()->terminating(function () use ($video) {
+            $this->videoService->reconcileFromCloudflare($video);
+        });
 
         return response()->json([
             'success' => true,
