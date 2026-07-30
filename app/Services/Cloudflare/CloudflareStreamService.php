@@ -115,6 +115,23 @@ class CloudflareStreamService
             'maxdurationseconds' => (string) $maxDurationSeconds,
         ]);
 
+        /*
+         * `direct_user=true` MUST travel as a query parameter, not in the body.
+         * It is what decides which host Cloudflare puts in the Location header:
+         *
+         *   with it     https://upload.cloudflarestream.com/tus/<id>?tusv2=true
+         *   without it  https://edge-production.gateway.api.cloudflare.com/
+         *               client/v4/accounts/<account>/media/<id>?tusv2=true
+         *
+         * Both create the video and both answer 201, so the mistake is invisible
+         * server-side. Only the first URL is usable from a browser: it allows
+         * unauthenticated PATCH and sends the tus CORS headers. The second sits on
+         * the authenticated API surface, where an unauthenticated HEAD answers 400
+         * with no Access-Control-Allow-Origin at all — so the browser reports a
+         * bare network failure and every resumable upload from the SPA dies.
+         *
+         * Sent as a body field it is simply ignored, which is what happened here.
+         */
         $response = Http::withToken($apiToken)
             ->withHeaders([
                 'Tus-Resumable' => '1.0.0',
@@ -122,17 +139,11 @@ class CloudflareStreamService
                 'Upload-Metadata' => $metadata,
                 'Upload-Creator' => $creatorId,
             ])
+            ->withQueryParameters(['direct_user' => 'true'])
             ->post(
-                "https://api.cloudflare.com/client/v4/accounts/{$accountId}/stream",
-                [
-                    'direct_user' => true,
-                ]
+                "https://api.cloudflare.com/client/v4/accounts/{$accountId}/stream"
             );
 
-        /*
-         * Depending on Laravel HTTP-client behavior, query parameters should
-         * preferably be added through withOptions/query as shown below.
-         */
         if (! $response->successful()) {
             throw new RuntimeException(
                 'Cloudflare tus endpoint creation failed: '.
