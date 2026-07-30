@@ -58,6 +58,11 @@ class VideoController extends Controller
             userId: $request->user()->id,
             title: $request->input('title', 'Untitled Video'),
             description: $request->input('description', null),
+            // The client sends this and always did; it was being dropped here, so
+            // every upload on this path silently inherited Cloudflare's 1 hour
+            // default and any longer recording was rejected at processing time.
+            fileSize: $request->integer('file_size'),
+            maxDurationSeconds: $request->integer('max_duration_seconds', 7200),
         );
 
         return response()->json([

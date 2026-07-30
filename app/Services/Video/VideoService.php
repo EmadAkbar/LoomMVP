@@ -58,8 +58,13 @@ class VideoService
             ->paginate($perPage);
     }
 
-    public function createUploadUrl(int $userId, string $title = 'Untitled Video', ?string $description = null): array
-    {
+    public function createUploadUrl(
+        int $userId,
+        string $title = 'Untitled Video',
+        ?string $description = null,
+        int $fileSize = 0,
+        int $maxDurationSeconds = 7200,
+    ): array {
         $video = Video::query()->create([
             'user_id' => $userId,
             'title' => $title,
@@ -67,6 +72,9 @@ class VideoService
             'slug' => $this->uniqueSlug($title),
             'status' => VideoStatus::Uploading,
             'privacy' => VideoPrivacy::Public,
+            // Recorded up front like the tus path does, so the library shows a real
+            // size instead of a blank while the upload is still running.
+            'size_bytes' => $fileSize > 0 ? $fileSize : null,
         ]);
 
         try {
@@ -75,7 +83,7 @@ class VideoService
                 'user_id' => (string) $userId,
                 'title' => $title,
                 'description' => $description,
-            ]);
+            ], $maxDurationSeconds);
 
             $uploadUid = $directUpload['uid'] ?? null;
             $uploadUrl = $directUpload['uploadURL'] ?? null;
@@ -309,6 +317,15 @@ class VideoService
                 : (int) $video->processing_percentage;
         }
 
+        // Whether THIS call is the moment the video first becomes ready, as
+        // opposed to a duplicate/redelivered `ready` event arriving after it
+        // already was. Cloudflare's own `size` reading can still shift by a few
+        // percent in the seconds around encoding finishing (audio analysis,
+        // rendition bookkeeping) — accepting it only once, on the very first
+        // transition, is what stops a later duplicate delivery from quietly
+        // changing the number a user already saw on another page.
+        $isFirstReadyTransition = $isReady && $video->status !== VideoStatus::Ready;
+
         // `ready` is terminal. Out-of-order deliveries are normal with webhooks,
         // and re-processing an older event must not corrupt a settled status.
         if ($video->status === VideoStatus::Ready && ! $isFailed) {
@@ -320,7 +337,14 @@ class VideoService
             'status' => $status,
             'processing_percentage' => $percentage,
             'duration_seconds' => (int) round((float) (data_get($payload, 'duration') ?? data_get($payload, 'result.duration') ?? 0)) ?: $video->duration_seconds,
-            'size_bytes' => $this->extractSizeBytes($payload) ?? $video->size_bytes,
+            // Only trust Cloudflare's `size` on the first ready transition — see
+            // $isFirstReadyTransition above. Before ready it is a still-changing
+            // estimate, not the final delivered file, and after the first ready
+            // write it must never move again — either one changing mid-flight is
+            // exactly what let two pages, fetching moments apart, freeze on
+            // different numbers for the same video. See backfillCloudflareDownload()
+            // for the matching guard on the same field.
+            'size_bytes' => $isFirstReadyTransition ? ($this->extractSizeBytes($payload) ?? $video->size_bytes) : $video->size_bytes,
             'thumbnail_url' => data_get($payload, 'thumbnail') ?? data_get($payload, 'result.thumbnail') ?? $video->thumbnail_url,
             'playback_url' => data_get($payload, 'playback.hls') ?? data_get($payload, 'result.playback.hls') ?? $video->playback_url,
             'download_url' => $this->extractDownloadUrl($payload) ?? $video->download_url,
@@ -431,7 +455,19 @@ class VideoService
             return;
         }
 
-        if ($video->download_url && $video->size_bytes) {
+        // Each field is missing-or-not on its own; treating them as one "need to
+        // fetch" flag was the bug. `download_url` is genuinely never in a webhook
+        // payload — every ready video needs this call once, purely for the
+        // Download button — so it alone triggering the fetch is correct. What
+        // wasn't correct: size_bytes riding along and getting silently
+        // OVERWRITTEN by a second, later Cloudflare reading, purely because
+        // download_url happened to still be empty. That is exactly how two pages
+        // fetched moments apart ended up showing different sizes for the same
+        // video — this call was quietly replacing an already-correct number.
+        $needsDownloadUrl = ! $video->download_url;
+        $needsSizeBytes = ! $video->size_bytes;
+
+        if (! $needsDownloadUrl && ! $needsSizeBytes) {
             return;
         }
 
@@ -445,13 +481,20 @@ class VideoService
         $sizeBytes = $video->size_bytes;
 
         try {
-            $download = $this->cloudflareStreamService->createDownload($uid);
-            $downloadUrl = $this->extractDownloadUrl($download) ?? $downloadUrl;
+            if ($needsDownloadUrl) {
+                $download = $this->cloudflareStreamService->createDownload($uid);
+                $downloadUrl = $this->extractDownloadUrl($download) ?? $downloadUrl;
+            }
 
-            if (! $downloadUrl || ! $sizeBytes) {
+            if ($needsSizeBytes || ($needsDownloadUrl && ! $downloadUrl)) {
                 $cloudflareVideo = $this->cloudflareStreamService->getVideo($uid);
                 $downloadUrl = $this->extractDownloadUrl($cloudflareVideo) ?? $downloadUrl;
-                $sizeBytes = $this->extractSizeBytes($cloudflareVideo) ?? $sizeBytes;
+                // Only accept the size from this call if it was genuinely missing.
+                // Falling through here to resolve a still-missing download_url must
+                // not let a size that already exists get replaced along the way.
+                if ($needsSizeBytes) {
+                    $sizeBytes = $this->extractSizeBytes($cloudflareVideo) ?? $sizeBytes;
+                }
             }
         } catch (Throwable $exception) {
             Log::channel('webhooks')->warning('Unable to resolve Cloudflare download URL or size during webhook sync.', [

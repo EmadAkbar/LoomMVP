@@ -216,6 +216,107 @@ class VideoServiceSyncTest extends TestCase
     }
 
     /**
+     * The exact bug this pins down: createDownload() fails to yield a URL, so the
+     * method falls back to getVideo() to resolve download_url — and that fallback
+     * call must not be allowed to clobber a size_bytes that was already correct.
+     * Before the fix, `if (! $downloadUrl || ! $sizeBytes)` triggered on
+     * `! $downloadUrl` alone and blindly overwrote size_bytes too, which is how a
+     * video ended up showing two different file sizes on two different pages.
+     */
+    public function test_backfill_never_overwrites_an_existing_size_bytes(): void
+    {
+        $video = $this->makeVideo('cf-size-guard-uid', [
+            'status' => VideoStatus::Ready,
+            'size_bytes' => 39500000,
+        ]);
+
+        $cloudflareMock = Mockery::mock(CloudflareStreamService::class);
+        $cloudflareMock->shouldReceive('createDownload')
+            ->once()
+            ->andReturn(['default' => []]); // no url in the response
+        $cloudflareMock->shouldReceive('getVideo')
+            ->once()
+            ->andReturn(['size' => 41400000, 'default' => ['url' => 'https://cf.example.com/x.mp4']]);
+        $this->app->instance(CloudflareStreamService::class, $cloudflareMock);
+
+        /** @var VideoService $service */
+        $service = $this->app->make(VideoService::class);
+        $service->backfillCloudflareDownload($video);
+
+        $video->refresh();
+        $this->assertSame(39500000, $video->size_bytes);
+        $this->assertSame('https://cf.example.com/x.mp4', $video->download_url);
+    }
+
+    /** The counterpart: size_bytes really is missing, so it must still get filled. */
+    public function test_backfill_fills_size_bytes_when_genuinely_missing(): void
+    {
+        $video = $this->makeVideo('cf-size-fill-uid', [
+            'status' => VideoStatus::Ready,
+            'size_bytes' => null,
+            'download_url' => 'https://cf.example.com/already-known.mp4',
+        ]);
+
+        $cloudflareMock = Mockery::mock(CloudflareStreamService::class);
+        $cloudflareMock->shouldReceive('getVideo')
+            ->once()
+            ->andReturn(['size' => 5000000]);
+        $this->app->instance(CloudflareStreamService::class, $cloudflareMock);
+
+        /** @var VideoService $service */
+        $service = $this->app->make(VideoService::class);
+        $service->backfillCloudflareDownload($video);
+
+        $this->assertSame(5000000, $video->refresh()->size_bytes);
+    }
+
+    /**
+     * Cloudflare's `size` field on an in-progress webhook is a still-settling
+     * estimate, not the final delivered file. Taking it early is the other half of
+     * the same mismatch bug — a page that happened to poll during processing would
+     * freeze on a number Cloudflare later revised at the real `ready` event.
+     */
+    public function test_processing_webhook_does_not_touch_size_bytes(): void
+    {
+        $video = $this->makeVideo('cf-inprogress-size-uid', ['size_bytes' => null]);
+
+        $this->app->instance(CloudflareStreamService::class, Mockery::mock(CloudflareStreamService::class));
+        /** @var VideoService $service */
+        $service = $this->app->make(VideoService::class);
+
+        $synced = $service->syncFromCloudflarePayload([
+            'uid' => 'cf-inprogress-size-uid',
+            'readyToStream' => false,
+            'status' => ['state' => 'inprogress', 'pctComplete' => '50.000000'],
+            'size' => 12345, // an estimate mid-encode
+        ]);
+
+        $this->assertNull($synced->size_bytes);
+    }
+
+    /**
+     * A duplicate/redelivered `ready` webhook must not be allowed to nudge
+     * size_bytes again — only the first transition into ready may set it.
+     */
+    public function test_duplicate_ready_webhook_does_not_change_size_bytes_again(): void
+    {
+        $this->makeVideo('cf-dup-ready-uid', ['status' => VideoStatus::Ready, 'size_bytes' => 39500000]);
+
+        $this->app->instance(CloudflareStreamService::class, Mockery::mock(CloudflareStreamService::class));
+        /** @var VideoService $service */
+        $service = $this->app->make(VideoService::class);
+
+        $synced = $service->syncFromCloudflarePayload([
+            'uid' => 'cf-dup-ready-uid',
+            'readyToStream' => true,
+            'status' => ['state' => 'ready'],
+            'size' => 41400000, // Cloudflare's number shifted since the first delivery
+        ]);
+
+        $this->assertSame(39500000, $synced->size_bytes);
+    }
+
+    /**
      * The stuck-video case: bytes are all uploaded, Cloudflare has finished
      * transcoding, but its webhook never arrived — guaranteed in local dev, where
      * Cloudflare cannot reach the dev server. Pulling the status must recover it.
