@@ -82,7 +82,7 @@ class VideoService
         ];
     }
 
-    public function createTusUploadUrl( int $userId, string $title, ?string $description, string $fileName, int $fileSize, string $fileType = 'video/webm', int $maxDurationSeconds = 7200 ): array
+    public function createTusUploadUrl(int $userId, string $title, ?string $description, string $fileName, int $fileSize, string $fileType = 'video/webm', int $maxDurationSeconds = 7200): array
     {
         $video = Video::query()->create([
             'user_id' => $userId,
@@ -166,7 +166,18 @@ class VideoService
     public function delete(Video $video): void
     {
         if ($video->cloudflare_uid) {
-            $this->cloudflareStreamService->deleteVideo($video->cloudflare_uid);
+            try {
+                $this->cloudflareStreamService->deleteVideo($video->cloudflare_uid);
+            } catch (\RuntimeException $e) {
+                if (str_contains($e->getMessage(), '"code": 10003')) {
+                    Log::warning('Cloudflare video not found. Deleting database record.', [
+                        'video_id' => $video->id,
+                        'cloudflare_uid' => $video->cloudflare_uid,
+                    ]);
+                } else {
+                    throw $e;
+                }
+            }
         }
 
         $video->delete();
@@ -247,9 +258,9 @@ class VideoService
 
         while (
             Video::query()
-                ->where('slug', $slug)
-                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
-                ->exists()
+            ->where('slug', $slug)
+            ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+            ->exists()
         ) {
             $slug = $baseSlug . '-' . $counter;
             $counter++;
