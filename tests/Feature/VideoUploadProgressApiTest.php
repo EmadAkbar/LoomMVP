@@ -25,10 +25,10 @@ class VideoUploadProgressApiTest extends TestCase
             'processing_percentage' => 42,
         ])
             ->assertOk()
-            ->assertJsonPath('data.processing_percentage', 42)
+            ->assertJsonPath('data.upload_percentage', 42)
             ->assertJsonPath('data.status', 'uploading');
 
-        $this->assertSame(42, $video->refresh()->processing_percentage);
+        $this->assertSame(42, $video->refresh()->upload_percentage);
     }
 
     /**
@@ -49,7 +49,9 @@ class VideoUploadProgressApiTest extends TestCase
         ])->assertOk()->assertJsonPath('data.status', 'uploading');
 
         $video->refresh();
-        $this->assertSame(100, $video->processing_percentage);
+        $this->assertSame(100, $video->upload_percentage);
+        // The transcode stage is untouched by an upload ping.
+        $this->assertSame(0, $video->processing_percentage);
         $this->assertSame(VideoStatus::Uploading, $video->status);
     }
 
@@ -79,7 +81,7 @@ class VideoUploadProgressApiTest extends TestCase
             'processing_percentage' => 50,
         ])->assertStatus(403);
 
-        $this->assertSame(0, $video->refresh()->processing_percentage);
+        $this->assertSame(0, $video->refresh()->upload_percentage);
     }
 
     public function test_progress_requires_authentication(): void

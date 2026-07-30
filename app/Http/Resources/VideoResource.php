@@ -23,6 +23,7 @@ class VideoResource extends JsonResource
             'download_url' => $this->download_url,
             'slug' => $this->slug,
             'processing_percentage' => $this->processing_percentage,
+            'upload_percentage' => $this->upload_percentage,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'views' => (int) $this->views_count,

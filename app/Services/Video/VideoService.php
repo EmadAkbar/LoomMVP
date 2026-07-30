@@ -242,13 +242,18 @@ class VideoService
         $percentage = max(0, min(100, $percentage));
 
         // Equal is not worth a write; lower means an out-of-order request.
-        if ($percentage <= (int) $video->processing_percentage) {
+        if ($percentage <= (int) $video->upload_percentage) {
             return $video;
         }
 
+        // `upload_percentage`, never `processing_percentage`. They are separate
+        // stages measuring different things — bytes leaving the browser versus
+        // Cloudflare transcoding — and sharing one column is what made the bar
+        // hit 100% and then snap back to 15% when Cloudflare's first webhook
+        // landed. Each stage is now monotonic on its own.
         $video->update([
             'status' => VideoStatus::Uploading,
-            'processing_percentage' => $percentage,
+            'upload_percentage' => $percentage,
         ]);
 
         return $video;
@@ -308,13 +313,20 @@ class VideoService
             $percentage = 100;
         } else {
             $status = VideoStatus::Processing;
-            // Real transcode progress when Cloudflare sends it (a string such as
-            // "39.000000"); otherwise hold whatever the upload already reported
-            // rather than snapping the bar back to a hardcoded 50.
+            // Real transcode progress from Cloudflare (a string such as
+            // "39.000000") — never a timer or a synthesised increment. Absent a
+            // reading, hold the last one rather than inventing a number.
             $reported = data_get($payload, 'status.pctComplete') ?? data_get($payload, 'result.status.pctComplete');
             $percentage = $reported !== null
                 ? max(0, min(100, (int) round((float) $reported)))
                 : (int) $video->processing_percentage;
+
+            // Monotonic within the processing stage. Webhook deliveries arrive
+            // out of order, so a redelivered "15%" after "33%" must not walk the
+            // bar backwards.
+            if ($video->status === VideoStatus::Processing) {
+                $percentage = max($percentage, (int) $video->processing_percentage);
+            }
         }
 
         // Whether THIS call is the moment the video first becomes ready, as
@@ -336,6 +348,13 @@ class VideoService
         $video->update([
             'status' => $status,
             'processing_percentage' => $percentage,
+            // Once Cloudflare is transcoding it necessarily has every byte, so
+            // the upload stage is complete — settle it at 100 rather than leaving
+            // whatever the last in-flight ping happened to report. Only ever
+            // moves forward.
+            'upload_percentage' => $isAwaitingBytes
+                ? (int) $video->upload_percentage
+                : max(100, (int) $video->upload_percentage),
             'duration_seconds' => (int) round((float) (data_get($payload, 'duration') ?? data_get($payload, 'result.duration') ?? 0)) ?: $video->duration_seconds,
             // Only trust Cloudflare's `size` on the first ready transition — see
             // $isFirstReadyTransition above. Before ready it is a still-changing

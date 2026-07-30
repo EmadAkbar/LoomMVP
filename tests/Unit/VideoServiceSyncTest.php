@@ -179,17 +179,20 @@ class VideoServiceSyncTest extends TestCase
         /** @var VideoService $service */
         $service = $this->app->make(VideoService::class);
 
+        // Upload progress lives in its own column, so reaching 100% cannot be
+        // overwritten by Cloudflare's first transcode reading.
         $service->recordUploadProgress($video, 40);
-        $this->assertSame(40, $video->refresh()->processing_percentage);
+        $this->assertSame(40, $video->refresh()->upload_percentage);
 
         // An out-of-order request from a slow connection must not rewind the bar.
         $service->recordUploadProgress($video, 12);
-        $this->assertSame(40, $video->refresh()->processing_percentage);
+        $this->assertSame(40, $video->refresh()->upload_percentage);
 
         // A finished byte transfer is not a playable video.
         $service->recordUploadProgress($video, 100);
         $video->refresh();
-        $this->assertSame(100, $video->processing_percentage);
+        $this->assertSame(100, $video->upload_percentage);
+        $this->assertSame(0, $video->processing_percentage);
         $this->assertSame(VideoStatus::Uploading, $video->status);
     }
 
@@ -213,6 +216,7 @@ class VideoServiceSyncTest extends TestCase
         $video->refresh();
         $this->assertSame(VideoStatus::Ready, $video->status);
         $this->assertSame(100, $video->processing_percentage);
+        $this->assertSame(0, $video->upload_percentage);
     }
 
     /**
@@ -507,6 +511,50 @@ class VideoServiceSyncTest extends TestCase
 
         $this->assertSame(VideoStatus::Uploading, $synced->status);
         $this->assertSame(70, $synced->processing_percentage);
+    }
+
+    /**
+     * The reported symptom: the bar ran to 100% on upload, then snapped back to
+     * 15% when Cloudflare's first transcode webhook landed. Two different
+     * measurements were sharing one column.
+     */
+    public function test_upload_completion_survives_the_first_processing_webhook(): void
+    {
+        $video = $this->makeVideo('cf-stage-uid');
+        $this->app->instance(CloudflareStreamService::class, Mockery::mock(CloudflareStreamService::class));
+        /** @var VideoService $service */
+        $service = $this->app->make(VideoService::class);
+
+        $service->recordUploadProgress($video, 100);
+        $this->assertSame(100, $video->refresh()->upload_percentage);
+
+        $synced = $service->syncFromCloudflarePayload([
+            'uid' => 'cf-stage-uid',
+            'readyToStream' => false,
+            'status' => ['state' => 'inprogress', 'pctComplete' => '15.000000'],
+        ]);
+
+        // Upload stays finished; processing starts its own count at 15.
+        $this->assertSame(100, $synced->upload_percentage);
+        $this->assertSame(15, $synced->processing_percentage);
+        $this->assertSame(VideoStatus::Processing, $synced->status);
+    }
+
+    /** Out-of-order webhooks must not walk the transcode bar backwards. */
+    public function test_processing_progress_is_monotonic(): void
+    {
+        $this->makeVideo('cf-monotonic-uid', ['status' => VideoStatus::Processing, 'processing_percentage' => 33]);
+        $this->app->instance(CloudflareStreamService::class, Mockery::mock(CloudflareStreamService::class));
+        /** @var VideoService $service */
+        $service = $this->app->make(VideoService::class);
+
+        $synced = $service->syncFromCloudflarePayload([
+            'uid' => 'cf-monotonic-uid',
+            'readyToStream' => false,
+            'status' => ['state' => 'inprogress', 'pctComplete' => '15.000000'],
+        ]);
+
+        $this->assertSame(33, $synced->processing_percentage);
     }
 
     private function makeVideo(string $uid, array $attributes = []): Video

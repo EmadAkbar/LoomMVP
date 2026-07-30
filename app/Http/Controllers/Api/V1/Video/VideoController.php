@@ -130,6 +130,7 @@ class VideoController extends Controller
                 'uuid' => $video->uuid,
                 'status' => $video->status?->value ?? $video->status,
                 'processing_percentage' => (int) $video->processing_percentage,
+                'upload_percentage' => (int) $video->upload_percentage,
             ],
             'errors' => null,
         ]);

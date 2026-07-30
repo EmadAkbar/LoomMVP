@@ -35,6 +35,7 @@ class Video extends Model
         'download_url',
         'slug',
         'processing_percentage',
+        'upload_percentage',
         'cloudflare_meta',
     ];
 
@@ -44,6 +45,7 @@ class Video extends Model
         'duration_seconds' => 'integer',
         'size_bytes' => 'integer',
         'processing_percentage' => 'integer',
+        'upload_percentage' => 'integer',
         'cloudflare_meta' => 'array',
     ];
 
